@@ -1,0 +1,38 @@
+[tools]
+python = "3.14.6"
+uv = "0.11.16"
+
+[env]
+UV_CACHE_DIR = "{{config_root}}/.cache/uv"
+
+[tasks.setup]
+description = "Install the locked development environment"
+run = "uv sync --locked"
+
+[tasks.check]
+description = "Check formatting, lint, types, and documentation"
+run = ["uv run --locked ruff check .", "uv run --locked ruff format --check .", "uv run --locked mypy", "uv run --locked python scripts/check_docs.py"]
+
+[tasks.test]
+description = "Run the independent correctness and integration tests"
+run = "uv run --locked pytest --cov=erabu --cov-report=term-missing"
+
+[tasks.examples]
+description = "Run the three domain examples"
+run = ["uv run --locked python examples/exercise.py", "uv run --locked python examples/shipping.py", "uv run --locked python examples/shifts.py"]
+
+[tasks.build]
+description = "Build the wheel and source distribution"
+run = "uv build"
+
+[tasks.benchmark]
+description = "Compare model preparation with indexed Python and report solver timings"
+run = "uv run --locked python benchmarks/preparation.py"
+
+[tasks."verify:wheel"]
+description = "Build and verify an installed wheel outside the checkout"
+run = "uv run --locked python scripts/verify_wheel.py"
+
+[tasks.verify]
+description = "Run all release-readiness checks"
+depends = ["check", "test", "examples", "verify:wheel"]
