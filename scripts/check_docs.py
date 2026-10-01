@@ -22,7 +22,7 @@ def main() -> None:
         files.extend(
             p
             for p in (ROOT / directory).rglob("*")
-            if p.is_file() and p.suffix in (".py", ".md", ".toml", ".yml", ".typed")
+            if p.is_file() and p.suffix in (".py", ".md", ".toml", ".yml", ".typed", ".csv")
         )
     for path in files:
         text = path.read_text(encoding="utf-8")

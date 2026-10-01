@@ -19,7 +19,7 @@ run = "uv run --locked pytest --cov=erabu --cov-report=term-missing"
 
 [tasks.examples]
 description = "Run the three domain examples"
-run = ["uv run --locked python examples/exercise.py", "uv run --locked python examples/shipping.py", "uv run --locked python examples/shifts.py"]
+run = ["uv run --locked python examples/exercise.py", "uv run --locked python examples/shipping/main.py", "uv run --locked python examples/shifts.py"]
 
 [tasks.build]
 description = "Build the wheel and source distribution"

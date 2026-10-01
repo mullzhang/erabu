@@ -4,9 +4,13 @@ Run `mise run verify` for formatting, lint, strict type checks, documentation
 checks, the test suite, standalone examples, and isolated package verification.
 
 The correctness tests enumerate all selections for the three-candidate exercise
-and four-candidate shipping examples. Seeded six-candidate problems compare both
-minimization and maximization against plain-Python calculations, including signed
-pair coefficients, variance, squared targets, and a quadratic constraint.
+example and a four-candidate shipping CSV fixture. The shipping fixture also checks
+that leading zeros and the ID `NA` survive CSV loading. A separate test adds a job
+without any route and confirms that both coverage modes remain infeasible.
+The bundled 120-candidate shipping solutions are checked against the original CSV
+tables for ship limits, job coverage, and total cost. Seeded six-candidate problems
+compare both minimization and maximization against plain-Python calculations,
+including signed pair coefficients, variance, squared targets, and a quadratic constraint.
 These small-instance checks do not establish performance on larger applications.
 
 Controlled solver replies cover optimal, feasible, infeasible, no-incumbent, and
@@ -20,11 +24,15 @@ empty selections, invalid values, and rejection before large quadratic expansion
 The README Python example is executed by `scripts/check_docs.py`; other Python
 snippets are parsed, and repository-local documentation links are checked.
 Public project files are checked for ASCII text to keep repository content in
-English. `docs_local` is excluded from that check and from distributions.
+English, including the example CSV files. `docs_local` is excluded from that check
+and from distributions.
 
 `mise run verify:wheel` builds a source distribution and wheel, rebuilds the wheel
 from the source archive, installs it with locked runtime dependencies in a fresh
-environment, and runs every example using isolated Python outside the checkout.
+environment, and runs every example from the extracted source archive using
+isolated Python outside the checkout. This also verifies that the shipping CSV
+files are present and that their default paths do not depend on the working
+directory.
 It checks that `erabu` was imported from that environment, that `py.typed` is
 included, and that local planning documents are absent from the distributions.
 

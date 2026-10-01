@@ -93,10 +93,17 @@ Missing targets then remain visible instead of disappearing from the model.
 | `problem.forbid_pairs(..., name="Conflicts")` | Prohibit simultaneous selection of specified pairs |
 | `selected.pair_sum(..., value="penalty")` | Sum coefficients for pairs selected together |
 
-See [shipping](examples/shipping.py) for coverage versus partitioning and
+See [shipping](examples/shipping/main.py) for coverage versus partitioning and
 [shifts](examples/shifts.py) for staffing, capacity, and workload balance.
-The shipping example has minimum cost 4 with overlapping coverage and 5 with
-exact partitioning. It also limits each ship to one full-period schedule.
+The shipping example reads 120 full-period schedules for 20 ships and 40 jobs from
+CSV files, and limits each ship to one schedule. Its bundled data has minimum cost
+1,114 with overlapping coverage and 1,876 with exact partitioning.
+See [the shipping guide](examples/shipping/README.md) for CSV schemas and custom data.
+
+```sh
+uv run --locked python examples/shipping/main.py
+uv run --locked python examples/shipping/main.py --data-dir /path/to/shipping-data
+```
 
 ## Results you can inspect
 
@@ -152,7 +159,7 @@ population variance, and pair sums. It does not generate candidates, implement
 column generation, optimize arbitrary Python functions, or provide a QUBO backend.
 
 Every candidate's internal feasibility remains the caller's responsibility.
-Examples use small synthetic data; they are not reproductions of external shipping
+Examples use synthetic data; they are not reproductions of external shipping
 or exercise studies. No large-instance performance claim is implied.
 
 ## Documentation

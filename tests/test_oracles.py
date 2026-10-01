@@ -4,6 +4,8 @@ import itertools
 import math
 import random
 import runpy
+import sys
+from collections import Counter
 from pathlib import Path
 
 import pandas as pd
@@ -12,11 +14,15 @@ import pytest
 from erabu import Problem, Status
 
 ROOT = Path(__file__).resolve().parents[1]
+SHIPPING_DIR = ROOT / "examples" / "shipping"
+SHIPPING_SCRIPT = SHIPPING_DIR / "main.py"
 
 
-@pytest.mark.parametrize("name", ["exercise", "shipping", "shifts"])
-def test_examples(name):
-    runpy.run_path(str(ROOT / "examples" / f"{name}.py"), run_name="__main__")
+@pytest.mark.parametrize("relative_path", ["exercise.py", "shipping/main.py", "shifts.py"])
+def test_examples(relative_path, monkeypatch):
+    script = ROOT / "examples" / relative_path
+    monkeypatch.setattr(sys, "argv", [str(script)])
+    runpy.run_path(str(script), run_name="__main__")
 
 
 def test_exercise_all_eight_selections():
@@ -31,9 +37,33 @@ def test_exercise_all_eight_selections():
         assert evaluation.metrics["Body totals"] == dict(zip(("arms", "legs"), totals, strict=True))
 
 
+@pytest.fixture
+def shipping_csv(tmp_path):
+    """A four-candidate oracle with string IDs that CSV inference could corrupt."""
+    files = {
+        "routes.csv": "pattern_id,ship,cost\n001,01,2\n002,01,3\n003,02,2\n004,02,3\n",
+        "route_jobs.csv": "pattern_id,job\n001,NA\n001,002\n002,NA\n003,002\n003,003\n004,003\n",
+        "ships.csv": "ship\n01\n02\n",
+        "jobs.csv": "job\nNA\n002\n003\n",
+    }
+    for name, text in files.items():
+        (tmp_path / name).write_text(text, encoding="utf-8")
+    return tmp_path
+
+
+def test_shipping_cli_reads_custom_directory(shipping_csv, monkeypatch, capsys):
+    monkeypatch.chdir(shipping_csv.parent)
+    monkeypatch.setattr(sys, "argv", [str(SHIPPING_SCRIPT), "--data-dir", str(shipping_csv)])
+    runpy.run_path(str(SHIPPING_SCRIPT), run_name="__main__")
+    output = capsys.readouterr().out
+    assert "Shipping (cover): OPTIMAL, cost=4.0" in output
+    assert "Shipping (partition): OPTIMAL, cost=5.0" in output
+    assert "Candidates: 4" in output
+
+
 @pytest.mark.parametrize("exact", [True, False])
-def test_shipping_all_sixteen_selections(exact):
-    problem = runpy.run_path(str(ROOT / "examples/shipping.py"))["build_problem"](exact=exact)
+def test_shipping_all_sixteen_selections(exact, shipping_csv):
+    problem = runpy.run_path(str(SHIPPING_SCRIPT))["build_problem"](shipping_csv, exact=exact)
     best = math.inf
     for x in itertools.product((0, 1), repeat=4):
         counts = (x[0] + x[1], x[0] + x[2], x[2] + x[3])
@@ -43,7 +73,7 @@ def test_shipping_all_sixteen_selections(exact):
             and all(c == 1 if exact else c >= 1 for c in counts)
         )
         cost = sum(a * b for a, b in zip(x, (2, 3, 2, 3), strict=True))
-        evaluation = problem.evaluate([f"r{i + 1}" for i in range(4) if x[i]])
+        evaluation = problem.evaluate([f"{i + 1:03d}" for i in range(4) if x[i]])
         assert evaluation.feasible == feasible
         assert evaluation.objective_value == cost
         if feasible:
@@ -51,6 +81,42 @@ def test_shipping_all_sixteen_selections(exact):
     result = problem.solve()
     assert result.status is Status.OPTIMAL
     assert result.objective_value == best == (5 if exact else 4)
+
+
+@pytest.mark.parametrize("exact", [True, False])
+def test_shipping_csv_retains_jobs_without_routes(exact, shipping_csv):
+    with (shipping_csv / "jobs.csv").open("a", encoding="utf-8") as file:
+        file.write("unserved\n")
+    problem = runpy.run_path(str(SHIPPING_SCRIPT))["build_problem"](shipping_csv, exact=exact)
+    result = problem.solve()
+    assert result.status is Status.INFEASIBLE
+    assert result.bundle is None
+
+
+@pytest.mark.parametrize("exact,expected", [(False, 1114), (True, 1876)])
+def test_shipping_csv_solution_against_original_tables(exact, expected):
+    directory = SHIPPING_DIR / "data"
+    routes = pd.read_csv(directory / "routes.csv")
+    membership = pd.read_csv(directory / "route_jobs.csv")
+    jobs = pd.read_csv(directory / "jobs.csv")["job"].tolist()
+    ships = pd.read_csv(directory / "ships.csv")["ship"].tolist()
+    problem = runpy.run_path(str(SHIPPING_SCRIPT))["build_problem"](directory, exact=exact)
+    assert problem.inspect().candidate_count == len(routes) == 120
+    assert len(ships) == 20
+    assert len(jobs) == 40
+    result = problem.solve()
+    assert result.status is Status.OPTIMAL
+    assert result.bundle is not None
+    chosen = routes[routes["pattern_id"].isin(result.bundle.pattern_ids)]
+    ship_counts = Counter(chosen["ship"])
+    job_counts = Counter(
+        membership[membership["pattern_id"].isin(result.bundle.pattern_ids)]["job"]
+    )
+    assert set(ship_counts) <= set(ships)
+    assert all(count <= 1 for count in ship_counts.values())
+    assert set(job_counts) == set(jobs)
+    assert all(count == 1 if exact else count >= 1 for count in job_counts.values())
+    assert result.objective_value == chosen["cost"].sum() == expected
 
 
 @pytest.mark.parametrize("seed", range(10))

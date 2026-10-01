@@ -21,8 +21,11 @@ def main() -> None:
         artifacts = work / "artifacts"
         run("uv", "build", "--out-dir", str(artifacts))
         (sdist,) = artifacts.glob("*.tar.gz")
+        source = work / "source"
         with tarfile.open(sdist) as archive:
             assert all("docs_local" not in name for name in archive.getnames())
+            archive.extractall(source, filter="data")
+        (project,) = source.iterdir()
         rebuilt = work / "rebuilt"
         run("uv", "build", str(sdist), "--wheel", "--out-dir", str(rebuilt))
         (wheel,) = rebuilt.glob("*.whl")
@@ -61,8 +64,8 @@ def main() -> None:
             "print('Verified installed import:', erabu.__file__)"
         )
         run(str(python), "-I", "-c", check, cwd=work)
-        for name in ("exercise", "shipping", "shifts"):
-            run(str(python), "-I", str(ROOT / "examples" / f"{name}.py"), cwd=work)
+        for script in ("exercise.py", "shipping/main.py", "shifts.py"):
+            run(str(python), "-I", str(project / "examples" / script), cwd=work)
     print("Source distribution, rebuilt wheel, and isolated examples passed.")
 
 
